@@ -1,6 +1,5 @@
 version: 0.2
 
-# Use a CodeBuild image like: aws/codebuild/standard:7.0 (supports these runtimes)
 env:
   variables:
     SERVICES: "adservice cartservice checkoutservice currencyservice emailservice frontend paymentservice productcatalogservice recommendationservice shippingservice loadgenerator"
@@ -8,10 +7,10 @@ env:
 phases:
   install:
     runtime-versions:
-      nodejs: 18          # paymentservice / any JS utilities
-      java: corretto17    # adservice
-      python: 3.10        # recommendationservice / loadgenerator (use 3.8 if you prefer)
-      golang: 1.20        # checkout/shipping/productcatalog/frontend (Go)
+      nodejs: 18
+      java: corretto17
+      python: 3.10    # use 3.8 if your image doesn't have 3.10
+      golang: 1.20
     commands:
       - echo "Installing additional test tools..."
       - yum install -y git jq tar gzip || true
@@ -40,49 +39,51 @@ phases:
           if [ ! -d "src/$s" ]; then
             echo "Skip: src/$s not found"; continue
           fi
-          pushd "src/$s" >/dev/null
 
-          # 1) Java (Maven)
-          if [ -f "pom.xml" ]; then
-            echo "[JAVA] mvn -q -DskipTests=false test"
-            mvn -q -DskipTests=false test || true
+          (
+            cd "src/$s"
 
-          # 2) Node.js
-          elif [ -f "package.json" ]; then
-            echo "[NODE] npm ci && npm test (if defined)"
-            npm ci || true
-            if node -e "p=require('./package.json');process.exit(p.scripts&&p.scripts.test?0:1)"; then
-              npm test --silent || true
+            # 1) Java (Maven)
+            if [ -f "pom.xml" ]; then
+              echo "[JAVA] mvn -q -DskipTests=false test"
+              mvn -q -DskipTests=false test || true
+
+            # 2) Node.js
+            elif [ -f "package.json" ]; then
+              echo "[NODE] npm ci && npm test (if defined)"
+              npm ci || true
+              if node -e "p=require('./package.json');process.exit(p.scripts&&p.scripts.test?0:1)"; then
+                npm test --silent || true
+              else
+                echo "No npm test script defined -> skipping tests"
+              fi
+
+            # 3) Go (go.mod)
+            elif [ -f "go.mod" ]; then
+              echo "[GO] go mod tidy && go test ./..."
+              go mod tidy || true
+              go test ./... || true
+
+            # 4) Python
+            elif [ -f "requirements.txt" ] || ls -1 *.py 2>/dev/null | grep -q . ; then
+              echo "[PYTHON] install deps (if any) and run pytest if tests found"
+              [ -f "requirements.txt" ] && pip3 install -r requirements.txt || true
+              if [ -d "tests" ] || ls -1 *_test.py 2>/dev/null | grep -q . ; then
+                pytest -q || true
+              else
+                echo "No pytest tests found -> skipping"
+              fi
+
+            # 5) .NET (cartservice)
+            elif ls -1 *.sln *.csproj 2>/dev/null | grep -q . ; then
+              echo "[.NET] Detected cartservice. .NET SDK not present in standard image -> skipping tests."
+              echo "Tip: use a .NET-enabled CodeBuild image or a dedicated project if you want to run them."
+
             else
-              echo "No npm test script defined -> skipping tests"
+              echo "No recognizable build/test files -> skipping"
             fi
+          )
 
-          # 3) Go (go.mod)
-          elif [ -f "go.mod" ]; then
-            echo "[GO] go mod tidy && go test ./..."
-            go mod tidy || true
-            go test ./... || true
-
-          # 4) Python
-          elif [ -f "requirements.txt" ] || ls -1 *.py 2>/dev/null | grep -q . ; then
-            echo "[PYTHON] install deps (if any) and run pytest if tests found"
-            [ -f "requirements.txt" ] && pip3 install -r requirements.txt || true
-            if [ -d "tests" ] || ls -1 *_test.py 2>/dev/null | grep -q . ; then
-              pytest -q || true
-            else
-              echo "No pytest tests found -> skipping"
-            fi
-
-          # 5) .NET (cartservice)
-          elif ls -1 *.sln *.csproj 2>/dev/null | grep -q . ; then
-            echo "[.NET] Detected cartservice. .NET SDK not present in standard image -> skipping tests."
-            echo "Tip: use a .NET-enabled CodeBuild image or a dedicated project if you want to run them."
-
-          else
-            echo "No recognizable build/test files -> skipping"
-          fi
-
-          popd >/dev/null
         done
 
   post_build:
