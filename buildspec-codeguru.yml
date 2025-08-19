@@ -1,47 +1,41 @@
 version: 0.2
 
-
 phases:
   install:
     runtime-versions:
       python: 3.9
     commands:
-      - echo "=== Installing AWS CLI v2 ==="
-      - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-      - unzip -q awscliv2.zip
-      - sudo ./aws/install --update
+      - echo "=== CodeGuru Reviewer stage ==="
+      - yum install -y jq >/dev/null 2>&1 || true
       - aws --version
   build:
     commands:
-      - echo "=== Running CodeGuru Reviewer Analysis ==="
-      # Create a CodeGuru Reviewer code review for the current repo/branch
-      - aws codeguru-reviewer create-code-review \
-          --name "pipeline-review-$(date +%s)" \
-          --type RepositoryAnalysis={RepositoryHead={BranchName=$CODEBUILD_SOURCE_VERSION}} \
-          --repository AssociationArn=$CODEGURU_ASSOCIATION_ARN \
-          --region $AWS_REGION > review-output.json
-
+      - echo "=== Start CodeGuru review ==="
+      # BRANCH and CODEGURU_ASSOCIATION_ARN should be set as environment variables in the CodeBuild project
+      - >
+        aws codeguru-reviewer create-code-review
+        --name "pipeline-review-$(date +%s)"
+        --type RepositoryAnalysis="{RepositoryHead={BranchName=${BRANCH}}}"
+        --association-arn "${CODEGURU_ASSOCIATION_ARN}"
+        --output json > review-output.json
       - cat review-output.json
       - export REVIEW_ARN=$(jq -r '.CodeReview.CodeReviewArn' review-output.json)
-      - echo "CodeGuru Review ARN: $REVIEW_ARN"
+      - echo "Review ARN: $REVIEW_ARN"
 
-      # Poll until completed
-      - echo "=== Waiting for CodeGuru Review to finish ==="
+      - echo "=== Polling for completion ==="
       - |
         for i in {1..20}; do
           STATUS=$(aws codeguru-reviewer describe-code-review \
-                     --code-review-arn $REVIEW_ARN \
+                     --code-review-arn "$REVIEW_ARN" \
                      --query 'CodeReview.State' --output text)
-          echo "Current status: $STATUS"
-          if [ "$STATUS" == "Completed" ]; then break; fi
-          if [ "$STATUS" == "Failed" ]; then echo "Review failed"; exit 1; fi
-          sleep 30
+          echo "Status: $STATUS (attempt $i/20)"
+          if [ "$STATUS" = "Completed" ]; then break; fi
+          if [ "$STATUS" = "Failed" ]; then echo "CodeGuru review failed"; exit 1; fi
+          sleep 15
         done
 
-      # Fetch metrics
-      - aws codeguru-reviewer describe-code-review \
-          --code-review-arn $REVIEW_ARN \
-          --query 'CodeReview.Metrics' --output json > review-metrics.json
+      - echo "=== Fetching metrics ==="
+      - aws codeguru-reviewer describe-code-review --code-review-arn "$REVIEW_ARN" --query 'CodeReview.Metrics' --output json > review-metrics.json
       - cat review-metrics.json
 
 artifacts:
