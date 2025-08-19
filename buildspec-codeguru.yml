@@ -1,34 +1,100 @@
 version: 0.2
+
+env:
+  variables:
+    # Set these in the CodeBuild project or CodePipeline env:
+    # CODEGURU_ASSOCIATION_ARN = arn:aws:codeguru-reviewer:<region>:<acct>:association/...
+    # BRANCH = main
+    # AWS_DEFAULT_REGION provided by project/runner; override here if needed.
+    POLL_MAX: "20"
+    POLL_SLEEP: "15"
+
 phases:
   install:
     runtime-versions:
       python: 3.9
     commands:
-      - "yum install -y jq >/dev/null 2>&1 || true"
-      - "aws --version"
+      - echo "=== CodeGuru Reviewer stage ==="
+      - yum install -y jq >/dev/null 2>&1 || true
+      - 'echo "Region: ${AWS_DEFAULT_REGION}"'
+      - aws sts get-caller-identity || true
+
   build:
     commands:
-      - "echo '=== Start CodeGuru review ==='"
+      - 'test -n "${CODEGURU_ASSOCIATION_ARN}" || { echo "ERROR: CODEGURU_ASSOCIATION_ARN is empty"; exit 1; }'
+      - 'test -n "${BRANCH}" || { echo "ERROR: BRANCH is empty"; exit 1; }'
+
+      # 1) Verify the association exists in this region
+      - >
+        aws codeguru-reviewer describe-repository-association
+        --association-arn "${CODEGURU_ASSOCIATION_ARN}"
+        --region "${AWS_DEFAULT_REGION}"
+        --output json > assoc.json
+      - 'jq . assoc.json || true'
+
+      # 2) Build a safe JSON payload for create-code-review
+      - >
+        cat > input.json <<EOF
+        {
+          "Name": "pipeline-review-$(date +%s)",
+          "RepositoryAssociationArn": "${CODEGURU_ASSOCIATION_ARN}",
+          "Type": {
+            "RepositoryAnalysis": {
+              "RepositoryHead": { "BranchName": "${BRANCH}" }
+            }
+          }
+        }
+        EOF
+      - 'cat input.json'
+
+      # 3) Create the code review and capture ARN
       - >
         REVIEW_ARN=$(aws codeguru-reviewer create-code-review
-        --name pipeline-review-$(date +%s)
-        --repository-association-arn "${CODEGURU_ASSOCIATION_ARN}"
-        --type "RepositoryAnalysis={RepositoryHead={BranchName=${BRANCH}}}"
-        --query 'CodeReview.CodeReviewArn' --output text)
-      - "echo ReviewARN=${REVIEW_ARN}"
+        --cli-input-json file://input.json
+        --region "${AWS_DEFAULT_REGION}"
+        --query 'CodeReview.CodeReviewArn' --output text) || {
+          echo "ERROR: create-code-review failed (check ARN/region/permissions).";
+          exit 1;
+        }
+      - 'echo "Review ARN: $REVIEW_ARN"'
+
+      # 4) Poll for completion
       - |
-        for i in {1..20}; do
+        for i in $(seq 1 ${POLL_MAX}); do
           STATUS=$(aws codeguru-reviewer describe-code-review \
             --code-review-arn "$REVIEW_ARN" \
-            --query 'CodeReview.State' --output text)
-          echo "Status: $STATUS (attempt $i/20)"
+            --region "${AWS_DEFAULT_REGION}" \
+            --query 'CodeReview.State' --output text 2>/dev/null || echo "Unknown")
+          echo "Status: $STATUS (attempt $i/${POLL_MAX})"
           [ "$STATUS" = "Completed" ] && break
-          [ "$STATUS" = "Failed" ] && echo 'CodeGuru review failed' && exit 1
-          sleep 15
+          if [ "$STATUS" = "Failed" ]; then
+            echo "CodeGuru review FAILED"
+            aws codeguru-reviewer describe-code-review \
+              --code-review-arn "$REVIEW_ARN" \
+              --region "${AWS_DEFAULT_REGION}" \
+              --output json || true
+            exit 1
+          fi
+          sleep "${POLL_SLEEP}"
         done
-      - "aws codeguru-reviewer describe-code-review --code-review-arn \"$REVIEW_ARN\" --query 'CodeReview.Metrics' --output json > review-metrics.json"
-      - "aws codeguru-reviewer list-recommendations --code-review-arn \"$REVIEW_ARN\" --output json > review-output.json"
+
+      # 5) Save metrics and recommendations
+      - >
+        aws codeguru-reviewer describe-code-review
+        --code-review-arn "$REVIEW_ARN"
+        --region "${AWS_DEFAULT_REGION}"
+        --query 'CodeReview.Metrics' --output json > review-metrics.json || true
+      - >
+        aws codeguru-reviewer list-recommendations
+        --code-review-arn "$REVIEW_ARN"
+        --region "${AWS_DEFAULT_REGION}"
+        --output json > review-output.json || true
+      - 'echo "=== Metrics ==="; cat review-metrics.json || true'
+      - 'echo "=== Recommendations ==="; cat review-output.json || true'
+
 artifacts:
   files:
-    - review-output.json
+    - assoc.json
+    - input.json
     - review-metrics.json
+    - review-output.json
