@@ -1,10 +1,6 @@
 version: 0.2
-
 env:
   variables:
-    # You set these in the CodeBuild project (or in the CodePipeline action env):
-    # CODEGURU_ASSOCIATION_ARN = arn:aws:codeguru-reviewer:<region>:<acct>:association/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-    # BRANCH = main
     POLL_MAX: "20"
     POLL_SLEEP: "15"
 
@@ -16,47 +12,44 @@ phases:
       - "echo '=== CodeGuru Reviewer stage (existing association) ==='"
       - "yum install -y jq >/dev/null 2>&1 || true"
       - "aws --version"
-      - "echo Region=${AWS_DEFAULT_REGION} BRANCH=${BRANCH}"
+      - 'echo "Region=${AWS_DEFAULT_REGION}  BRANCH=${BRANCH}"'
       - 'test -n "${CODEGURU_ASSOCIATION_ARN}" || { echo "ERROR: CODEGURU_ASSOCIATION_ARN is empty"; exit 1; }'
       - 'test -n "${BRANCH}" || { echo "ERROR: BRANCH is empty"; exit 1; }'
 
   build:
     commands:
-      # 1) Sanity-check the association ARN in this region
+      # Instead of describe (which hard-fails), list and confirm the ARN exists in this region
       - >
-        aws codeguru-reviewer describe-repository-association
-        --association-arn "${CODEGURU_ASSOCIATION_ARN}"
+        aws codeguru-reviewer list-repository-associations
         --region "${AWS_DEFAULT_REGION}"
-        --output json > assoc.json
-      - "echo 'Association OK:'; jq '.Association' assoc.json || true"
+        --output json > assoc-list.json
+      - 'echo "Associations in region:"; jq -r ".RepositoryAssociationSummaries[].AssociationArn" assoc-list.json || true'
+      - |
+        if ! jq -e --arg arn "${CODEGURU_ASSOCIATION_ARN}" \
+             '.RepositoryAssociationSummaries[]?|.AssociationArn==$arn' assoc-list.json >/dev/null; then
+          echo "ERROR: The provided CODEGURU_ASSOCIATION_ARN is not found in region ${AWS_DEFAULT_REGION}."
+          exit 1
+        fi
 
-      # 2) Build safe JSON for create-code-review (avoids quoting issues)
+      # Create review (safe JSON avoids quoting issues)
       - |
         cat > input.json <<EOF
         {
           "Name": "pipeline-review-$(date +%s)",
           "RepositoryAssociationArn": "${CODEGURU_ASSOCIATION_ARN}",
-          "Type": {
-            "RepositoryAnalysis": {
-              "RepositoryHead": { "BranchName": "${BRANCH}" }
-            }
-          }
+          "Type": { "RepositoryAnalysis": { "RepositoryHead": { "BranchName": "${BRANCH}" } } }
         }
         EOF
-      - "cat input.json"
+      - 'cat input.json'
 
-      #3) Create the CodeGuru review and capture its ARN
       - >
         REVIEW_ARN=$(aws codeguru-reviewer create-code-review
         --cli-input-json file://input.json
         --region "${AWS_DEFAULT_REGION}"
         --query 'CodeReview.CodeReviewArn' --output text) || {
-          echo "ERROR: create-code-review failed (check ARN/region/permissions).";
-          exit 1;
-        }
+          echo "ERROR: create-code-review failed (check ARN/region/perms)"; exit 1; }
       - 'echo "Review ARN: ${REVIEW_ARN}"'
 
-      # 4) Poll until Completed/Failed
       - |
         for i in $(seq 1 ${POLL_MAX}); do
           STATUS=$(aws codeguru-reviewer describe-code-review \
@@ -76,7 +69,6 @@ phases:
           sleep "${POLL_SLEEP}"
         done
 
-      # 5) Save metrics and recommendations
       - >
         aws codeguru-reviewer describe-code-review
         --code-review-arn "${REVIEW_ARN}"
@@ -92,7 +84,7 @@ phases:
 
 artifacts:
   files:
-    - assoc.json
+    - assoc-list.json
     - input.json
     - review-metrics.json
     - review-output.json
