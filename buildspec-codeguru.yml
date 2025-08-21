@@ -45,7 +45,7 @@ phases:
         EOF
       - "cat input.json"
 
-      # 3) Create the CodeGuru review and capture its ARN
+      #3) Create the CodeGuru review and capture its ARN
       - >
         REVIEW_ARN=$(aws codeguru-reviewer create-code-review
         --cli-input-json file://input.json
