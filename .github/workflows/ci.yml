@@ -1,0 +1,82 @@
+name: PR CI (changed services)
+on:
+    push:
+      branches:
+        - main
+    pull_request:
+      branches:
+        - main
+      paths:
+        - 'src/**'
+        - '.github/workflows/**.yml'
+
+permissions:
+    contents: read
+    security-events: write
+
+jobs:
+    detect:
+        name: Detect changed services
+        runs-on: ubuntu-latest
+        outputs:
+          matrix: ${{ steps.mk.outputs.matrix }}
+        steps:
+          - uses: actions/checkout@v4
+
+          # which files changed in this PR?
+          - id: changed
+            uses: tj-actions/changed-files@v45
+            with:
+              files: |
+                src/**
+
+          # build a JSON matrix of {services , languages , sonar}
+          - id: mk
+            run: |
+              # collect a unique service name under src/service_name
+              SERVICES=$(printf '%s\n' ${{ steps.changed.outputs.all_changed_files }} \
+                | awk -F/ '/^src\/[^/]+\// {print $2}' | sort -u)
+
+              # funtion to detect Language
+              detect_lang () {
+                svc="$1"
+                if   [ -f "src/$svc/package.json" ]; then echo node
+                elif [ -f "src/$svc/requirements.txt" ] || [ -f "src/$svc/pyproject.toml" ]; then echo python
+                elif [ -f "src/$svc/go.mod" ]; then echo go
+                elif [ -f "src/$svc/pom.xml" ] || [ -f "src/$svc/mvnw" ]; then echo java
+                else echo node; fi  # default fallback; adjust if needed
+              }
+              
+               # Build the matrix array
+              MATRIX_ITEMS="[]"
+              for svc in $SERVICES; do
+                [ -z "$svc" ] && continue
+                lang=$(detect_lang "$svc")
+                # SonarCloud project key convention: online-boutique-<service>
+                item=$(jq -n --arg s "$svc" --arg l "$lang" --arg sonar "online-boutique-$svc" \
+                  '{service:$s, language:$l, sonar:$sonar}')
+                MATRIX_ITEMS=$(jq -c --argjson it "$item" '. + [$it]' <<< "$MATRIX_ITEMS")
+              done
+
+              echo "matrix={\"include\":$MATRIX_ITEMS}" >> "$GITHUB_OUTPUT"
+
+    ci:
+      name: Run CI per service
+      needs: detect
+      if: ${{ fromJSON(needs.detect.outputs.matrix).include != null && fromJSON(needs.detect.outputs.matrix).include != '' }}
+      runs-on: ubuntu-latest
+      strategy:
+        fail-fast: false
+        matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+
+      steps:
+        # Call the reusable workflow for each changed service
+        - name: Reusable CI (${{ matrix.service }})
+          uses: ./.github/workflows/_reusable-service-ci.yml
+          with:
+            service:  ${{ matrix.service }}
+            language: ${{ matrix.language }}
+            sonar_project_key: ${{ matrix.sonar }}
+            # Your services live in src/<service>
+            working_dir: src/${{ matrix.service }}
+

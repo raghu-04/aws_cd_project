@@ -18,8 +18,11 @@ on:
         
 jobs:
   ci:
-    name: CI (${{ input.service }})
+    name: CI (${{ inputs.service }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     defaults:
       run:
         working-directory: ${{ inputs.working_dir }}
@@ -32,22 +35,22 @@ jobs:
         ## Node , python , Go , Java
 
       - name: setup Node
-        if: ${{ inputs.language == "node" }}
+        if: ${{ inputs.language == 'node' }}
         uses: actions/setup-node@v4
         with: { node-version: '20' }
 
       - name: setup python
-        if: ${{ inputs.language == "python" }}
+        if: ${{ inputs.language == 'python' }}
         uses: actions/setup-python@v5
         with: { python-version: '3.11' }
 
       - name: setup Go
-        if: ${{ inputs.language == "go" }}
+        if: ${{ inputs.language == 'go' }}
         uses: actions/setup-go@v5
         with: { go-version: '1.22' }
 
       - name: setup java
-        if: ${{ inputs.language == "java" }}
+        if: ${{ inputs.language == 'java' }}
         uses: actions/setup-java@v4
         with: 
           distribution: temurin
