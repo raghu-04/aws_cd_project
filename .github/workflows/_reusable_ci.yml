@@ -92,8 +92,19 @@ jobs:
             - name: Restore and Test (.NET)
               if: ${{ inputs.language == 'csharp' }}
               run: |
-                dotnet restore
-                dotnet test --verbosity normal
+                # Run .NET tests only if a solution or project exists
+                if compgen -G "*.sln" > /dev/null; then
+                  dotnet restore
+                  dotnet test --verbosity normal
+                elif compgen -G "**/*.csproj" > /dev/null; then
+                  # Restore & test each project individually
+                  while IFS= read -r -d '' proj; do
+                    dotnet restore "$proj"
+                    dotnet test "$proj" --verbosity normal
+                  done < <(find . -name "*.csproj" -print0)
+                else
+                  echo "No .NET solution or project found; skipping .NET tests."
+                fi
             
             ######SonarQube Analysis######
             - name: SonarQube Scan
