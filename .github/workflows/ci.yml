@@ -20,6 +20,7 @@ jobs:
     run_ci:
         name: Run CI for microservices
         uses: ./.github/workflows/_reusable_ci.yml
+        secrets: inherit
         strategy:
             matrix:
                 include:

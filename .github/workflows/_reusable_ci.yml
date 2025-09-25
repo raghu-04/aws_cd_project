@@ -101,12 +101,13 @@ jobs:
               uses: SonarSource/sonarqube-scan-action@v6
               env:
                 SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+                SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
                 SONAR_HOST_URL: https://sonarcloud.io
               with:
                 projectBaseDir: ${{ inputs.working_dir }}
                 args: >
                   -Dsonar.projectKey=${{ inputs.sonar_project_key }}
-                  -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+                  -Dsonar.organization=$SONAR_ORGANIZATION
                   -Dsonar.qualitygate.wait=true
 
             ######TrivyFSScan######
