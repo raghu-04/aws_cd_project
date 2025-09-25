@@ -49,7 +49,8 @@ jobs:
               uses: actions/setup-go@v5
               with:
                   go-version: '1.22'
-                  cache: 'go'
+                  cache: true
+                  cache-dependency-path: '**/go.sum'
             
             - name: setup Java
               if: ${{ inputs.language=='java' }}
