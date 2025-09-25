@@ -104,7 +104,7 @@ jobs:
               with:
                 projectBaseDir: ${{ inputs.working_dir }}
                 args: >
-                  -Dsonar.projectKey=${{ inputs.sonar_project_key }}
+                  -Dsonar.projectKey=${{ secrets.sonar_project_key }}
                   -Dsonar.qualitygate.wait=true
 
             ######TrivyFSScan######

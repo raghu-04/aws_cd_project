@@ -1,0 +1,60 @@
+name: CI file triggers the Tests based on the changes
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - 'src/**'
+            - '.github/workflows/ci.yml'
+    pull_request:
+        branches:
+            - main
+        paths:
+            - 'src/**'
+            - '.github/workflows/ci.yml'
+
+jobs: 
+    run_ci:
+        name: Run CI for microservices
+        uses: ./.github/workflows/_reusable_ci.yml
+        strategy:
+            matrix:
+                include:
+                    - service: adservice
+                      language: java
+                      sonar_project_key: online-botique_ad
+                    - service: cartservice
+                      language: csharp
+                      sonar_project_key: online-botique_cart
+                    - service: checkoutservice
+                      language: go
+                      sonar_project_key: online-botique_checkout
+                    - service: currencyservice
+                      language: nodejs
+                      sonar_project_key: online-botique_currency
+                    - service: emailservice
+                      language: python
+                      sonar_project_key: online-botique_email
+                    - service: frontend
+                      language: go
+                      sonar_project_key: online-botique_frontend
+                    - service: loadgenerator
+                      language: go
+                      sonar_project_key: online-botique_loadgenerator
+                    - service: paymentservice
+                      language: nodejs
+                      sonar_project_key: online-botique_payment
+                    - service: productcatalogservice
+                      language: go
+                      sonar_project_key: online-botique_productcatalog
+                    - service: recommendationservice
+                      language: python
+                      sonar_project_key: online-botique_recommendation
+                    - service: shippingservice
+                      language: go
+                      sonar_project_key: online-botique_shipping
+        with:
+            service: ${{ matrix.service }}
+            language: ${{ matrix.language }}
+            sonar_project_key: ${{ matrix.sonar_project_key }}
