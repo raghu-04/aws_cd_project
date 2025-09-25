@@ -98,7 +98,7 @@ jobs:
             ######SonarQube Analysis######
             - name: SonarQube Scan
               if: ${{ inputs.sonar_project_key != '' }}
-              uses: SonarSource/sonarqube-scan-action@v4
+              uses: SonarSource/sonarqube-scan-action@v6
               env:
                 SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
                 SONAR_HOST_URL: https://sonarcloud.io
@@ -106,6 +106,7 @@ jobs:
                 projectBaseDir: ${{ inputs.working_dir }}
                 args: >
                   -Dsonar.projectKey=${{ inputs.sonar_project_key }}
+                  -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
                   -Dsonar.qualitygate.wait=true
 
             ######TrivyFSScan######
