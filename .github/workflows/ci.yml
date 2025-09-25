@@ -7,12 +7,14 @@ on:
         paths:
             - 'src/**'
             - '.github/workflows/ci.yml'
+            - '.github/workflows/_reusable_ci.yml'
     pull_request:
         branches:
             - main
         paths:
             - 'src/**'
             - '.github/workflows/ci.yml'
+            - '.github/workflows/_reusable_ci.yml'
 
 jobs: 
     run_ci:
