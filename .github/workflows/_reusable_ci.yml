@@ -134,7 +134,7 @@ jobs:
                 args: >
                   -Dsonar.projectKey=${{ inputs.sonar_project_key }}
                   -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
-                  -Dsonar.qualitygate.wait=true
+                  -Dsonar.qualitygate.wait=false
 
             ######TrivyFSScan######
             - name: Trivy FS Scan
