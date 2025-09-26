@@ -21,9 +21,11 @@ jobs:
         name: CI for ${{ inputs.service }}
         runs-on: ubuntu-latest
         
+        env:
+          RESOLVED_WORKDIR: ${{ inputs.working_dir != '' && inputs.working_dir || format('src/{0}', inputs.service) }}
         defaults:
             run:
-                working-directory: ${{ inputs.working_dir }}
+                working-directory:  ${{ env.RESOLVED_WORKDIR }}
 
         steps:
             - name: Checkout code
@@ -43,8 +45,7 @@ jobs:
               with:
                   node-version: '20'
                   cache: 'npm'
-                  cache-dependency-path: ${{ inputs.working_dir }}/package-lock.json
-
+                  cache-dependency-path: ${{ env.RESOLVED_WORKDIR }}/package-lock.json
             - name: setup Python
               if: ${{ inputs.language=='python' }}
               uses: actions/setup-python@v5
@@ -58,7 +59,7 @@ jobs:
               with:
                   go-version: '1.22'
                   cache: true
-                  cache-dependency-path: '**/go.sum'
+                  cache-dependency-path: ${{ env.RESOLVED_WORKDIR }}/go.sum
             
             - name: setup Java
               if: ${{ inputs.language=='java' }}
@@ -66,6 +67,7 @@ jobs:
               with:
                   distribution: 'temurin'
                   java-version: '21'
+                  cache: ${{ hashFiles(format('{0}/gradlew', env.RESOLVED_WORKDIR)) != '' && 'gradle' || (hashFiles(format('{0}/mvnw', env.RESOLVED_WORKDIR)) != '' && 'maven' || '') }}
 
             - name: Setup .NET
               if: ${{ inputs.language == 'csharp' }}
@@ -91,10 +93,12 @@ jobs:
                     go test ./... -v;
                 fi
                                  # ----> Go
-                if ls **/*Test.java >/dev/null 2>&1; then 
-                    ./mvnw -q test; 
+                if [ -f gradlew ]; then
+                  ./gradlew -q test
+                elif ls **/*Test.java >/dev/null 2>&1 && [ -f mvnw ]; then
+                  ./mvnw -q test
                 fi
-                                 # ----> Java (Maven)
+                                 # ----> Java (Gradel,Maven)
 
             
             - name: Restore and Test (.NET)
@@ -119,11 +123,10 @@ jobs:
               if: ${{ inputs.sonar_project_key != '' }}
               uses: SonarSource/sonarqube-scan-action@v6
               env:
-                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-                ## SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}##
+                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}   
                 SONAR_HOST_URL: https://sonarcloud.io
               with:
-                projectBaseDir: ${{ inputs.working_dir }}
+                projectBaseDir: ${{ env.RESOLVED_WORKDIR }}
                 args: >
                   -Dsonar.projectKey=${{ inputs.sonar_project_key }}
                   -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
