@@ -77,7 +77,7 @@ jobs:
 
             - name: Ensure gradlew is executable
               if: ${{ inputs.language == 'java' }}
-              run: chmod +x "${{ env.RESOLVED_WORKDIR }}/gradlew"
+              run: chmod +x ./gradlew
             
             ######Install dependencies######
             - name: Install dependencies and run tests
