@@ -18,6 +18,9 @@ on:
 
 jobs: 
     run_ci:
+        permissions: 
+          contents: read
+          security-events: write
         name: Run CI for microservices
         uses: ./.github/workflows/_reusable_ci.yml
         secrets: inherit
