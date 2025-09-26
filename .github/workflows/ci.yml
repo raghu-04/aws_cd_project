@@ -70,3 +70,4 @@ jobs:
             language: ${{ matrix.language }}
             sonar_project_key: ${{ matrix.sonar_project_key }}
             working_dir: src/${{ matrix.service }}
+            sonar_extra_args: ${{ matrix.sonar_extra_args || '' }}

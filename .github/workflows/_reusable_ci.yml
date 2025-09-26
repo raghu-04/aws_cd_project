@@ -30,6 +30,7 @@ jobs:
         
         env:
           RESOLVED_WORKDIR: ${{ inputs.working_dir != '' && inputs.working_dir || format('src/{0}', inputs.service) }}
+          SONAR_NODE_DEFAULTS: ${{ inputs.language == 'nodejs' && '-Dsonar.c.file.suffixes=- -Dsonar.cpp.file.suffixes=- -Dsonar.objc.file.suffixes=- -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**' || '' }}
         defaults:
             run:
                 working-directory:  ${{ env.RESOLVED_WORKDIR }}
@@ -155,6 +156,7 @@ jobs:
                   -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
                   -Dsonar.qualitygate.wait=false
                   ${{ inputs.sonar_extra_args }}
+                  ${{ env.SONAR_NODE_DEFAULTS }}
                   ${{ inputs.language == 'java' && '-Dsonar.java.binaries=build/classes/java/main' || '' }}
 
             ######TrivyFSScan######
