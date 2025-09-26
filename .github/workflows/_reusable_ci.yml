@@ -15,6 +15,10 @@ on:
                 required: false
                 type: string
                 default: src/${{ inputs.service }}
+            sonar_extra_args:
+                required: false
+                type: string
+                default: ""
             
 jobs:
     ci:
@@ -138,6 +142,7 @@ jobs:
                   -Dsonar.projectKey=${{ inputs.sonar_project_key }}
                   -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
                   -Dsonar.qualitygate.wait=false
+                  ${{ inputs.sonar_extra_args }}
 
             ######TrivyFSScan######
             - name: Trivy FS Scan

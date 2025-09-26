@@ -51,6 +51,11 @@ jobs:
                     - service: paymentservice
                       language: nodejs
                       sonar_project_key: online-botique_payment
+                      sonar_extra_args: >
+                        -Dsonar.c.file.suffixes=-
+                        -Dsonar.cpp.file.suffixes=-
+                        -Dsonar.objc.file.suffixes=-
+                        -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**
                     - service: productcatalogservice
                       language: go
                       sonar_project_key: online-botique_productcatalog
