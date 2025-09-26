@@ -74,6 +74,10 @@ jobs:
               uses: actions/setup-dotnet@v4
               with:
                 dotnet-version: '8.0.x'
+
+            - name: Ensure gradlew is executable
+              if: ${{ inputs.language == 'java' }}
+              run: chmod +x "${{ env.RESOLVED_WORKDIR }}/gradlew"
             
             ######Install dependencies######
             - name: Install dependencies and run tests
