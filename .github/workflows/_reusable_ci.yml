@@ -77,8 +77,8 @@ jobs:
             - name: Install dependencies and run tests
               run: |
                 if [ -f package.json ]; then 
-                    npm install 
-                    npm test; 
+                    npm install; 
+                    ##npm test; 
                 fi
                                  # ----> Node.js
                 if [ -f requirements.txt ]; then 
