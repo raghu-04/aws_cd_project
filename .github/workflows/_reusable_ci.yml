@@ -82,9 +82,14 @@ jobs:
               with:
                 dotnet-version: '8.0.x'
 
-            - name: Ensure gradlew is executable
+            - name: Gradle build (classes only)
               if: ${{ inputs.language == 'java' }}
-              run: chmod +x ./gradlew
+              run: |
+                # ensure wrapper is executable (you already added this)
+                [ -x ./gradlew ] || chmod +x ./gradlew
+                # produce class files; skip tests if you want faster CI
+                ./gradlew -q classes
+                # or: ./gradlew -q build -x test
             
             ######Install dependencies######
             - name: Install dependencies and run tests
@@ -143,6 +148,7 @@ jobs:
                   -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
                   -Dsonar.qualitygate.wait=false
                   ${{ inputs.sonar_extra_args }}
+                  ${{ inputs.language == 'java' && format('-Dsonar.java.binaries={0}/build/classes', env.RESOLVED_WORKDIR) || '' }}
 
             ######TrivyFSScan######
 
