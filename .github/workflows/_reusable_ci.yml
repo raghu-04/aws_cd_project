@@ -132,6 +132,14 @@ jobs:
                 else
                   echo "No .NET solution or project found; skipping .NET tests."
                 fi
+
+            # sanity check - show some of the class files if Java
+            - name: Show Gradle classes
+              if: ${{ inputs.language == 'java' }}
+              run: |
+                pwd
+                ls -la build/classes || true
+                find build/classes -maxdepth 3 -type f -name "*.class" | head -n 10
             
             ######SonarQube Analysis######
             - name: SonarQube Scan
