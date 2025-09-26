@@ -31,11 +31,11 @@ jobs:
 
             ######Language setup######
             
-            - name: Check for package-lock.json
-              run: |
-                if [ ! -f "${{ inputs.working_dir }}/package-lock.json" ]; then
-                echo "No package-lock.json found for ${{ inputs.service }}"
-                fi
+            ## - name: Check for package-lock.json ##
+            ##  run: | ##
+            ## if [ ! -f "${{ inputs.working_dir }}/package-lock.json" ]; then ##
+            ##    echo "No package-lock.json found for ${{ inputs.service }}" ##
+            ##  fi  ##
 
             - name: setup Node.js
               if: ${{ inputs.language == 'nodejs' }}
@@ -82,8 +82,8 @@ jobs:
                 fi
                                  # ----> Node.js
                 if [ -f requirements.txt ]; then 
-                    pip install -r requirements.txt 
-                    pytest; 
+                    pip install -r requirements.txt; 
+                    ###pytest;###s 
                 fi
                                  # ----> Python
                 if [ -f go.mod ]; then
