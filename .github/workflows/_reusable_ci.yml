@@ -145,13 +145,15 @@ jobs:
                   ${{ inputs.sonar_extra_args }}
 
             ######TrivyFSScan######
+
             - name: Trivy FS Scan
               uses: aquasecurity/trivy-action@0.33.1
               with:
                 scan-type: fs
+                path: ${{ env.RESOLVED_WORKDIR }}
                 format: sarif
                 ignore-unfixed: 'true'
-                output: trivy-fs-${{ inputs.service }}.sarif
+                output: ${{ env.RESOLVED_WORKDIR }}/trivy-fs-${{ inputs.service }}.sarif
                 severity: 'CRITICAL,HIGH'
 
             - name: Upload sarif file
