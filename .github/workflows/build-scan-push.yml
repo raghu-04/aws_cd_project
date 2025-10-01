@@ -90,7 +90,7 @@ jobs:
             - name: Build image
               run: |
                 docker build \
-                    -f "${DOCKERFILE}" \
+                    -f "${context}/${DOCKERFILE}" \
                     -t "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag1 }}" \
                     "${CONTEXT}"
 
