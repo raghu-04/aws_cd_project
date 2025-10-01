@@ -104,12 +104,13 @@ jobs:
             - name: Build image
               run: |
                 docker build \
-                    -f "${context}/${DOCKERFILE}" \
+                    -f "${DOCKERFILE}" \
                     -t "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag1 }}" \
-                    "${CONTEXT}"
+                    .
 
             # Trivy image scan (fail on severity threshold)
             - name: Trivy Scan (image)
+              id: trivy
               uses: aquasecurity/trivy-action@0.24.0
               with:
                 image-ref: "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag1 }}"
