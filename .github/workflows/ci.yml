@@ -8,6 +8,7 @@ on:
             - 'src/**'
             - '.github/workflows/ci.yml'
             - '.github/workflows/_reusable_ci.yml'
+            - '.github/workflows/build-scan-push.yml'
     pull_request:
         branches:
             - main
@@ -15,16 +16,29 @@ on:
             - 'src/**'
             - '.github/workflows/ci.yml'
             - '.github/workflows/_reusable_ci.yml'
+            - '.github/workflows/build-scan-push.yml'
+permissions:
+    contents: read
+    security-events: write
+    id-token: write
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    AWS_REGION_DEFAULT: us-east-1
+    ECR_NAMESPACE_DEFAULT: online-botique
 
 jobs: 
-    run_ci:
-        permissions: 
-          contents: read
-          security-events: write
-        name: Run CI for microservices
+  ################SONARQUBE SCAN + TESTS#######################
+    sonar_each:
+        name: SonarQube scan + Tests (${{ matrix.service }})
         uses: ./.github/workflows/_reusable_ci.yml
         secrets: inherit
         strategy:
+            fail-fast: false
+            max-parallel: 4
             matrix:
                 include:
                     - service: adservice
@@ -71,3 +85,80 @@ jobs:
             sonar_project_key: ${{ matrix.sonar_project_key }}
             working_dir: src/${{ matrix.service }}
             sonar_extra_args: ${{ matrix.sonar_extra_args || '' }}
+
+    build_scan_push_each:
+      name: Build-->trivy-->push (${{ matrix.service }})
+      needs: [ sonar_each ]
+      uses: ./.github/workflows/build-scan-push.yml
+      secrets:
+        AWS_GHA_ROLE_ARN: ${{ secrets.AWS_GHA_ROLE_ARN }}
+      strategy:
+        fail-fast: false
+        max-parallel: 3
+        matrix:
+          include:
+            - service: adservice
+              context: src/adservice
+              dockerfile: Dockerfile
+              tags_extra: latest
+            
+            - service: cartservice
+              context: src/cartservice
+              dockerfile: Dockerfile
+              tags_extra: latest
+            
+            - service: checkoutservice
+              context: src/checkoutservice
+              dockerfile: Dockerfile
+              tags_extra: latest
+
+            - service: currencyservice
+              context: src/currencyservice
+              dockerfile: Dockerfile
+              tags_extra: latest
+
+            - service: emailservice
+              context: src/emailservice
+              dockerfile: Dockerfile
+              tags_extra: latest
+
+            - service: frontend
+              context: src/frontend
+              dockerfile: Dockerfile
+              tags_extra: latest
+
+            - service: loadgenerator
+              context: src/loadgenerator
+              dockerfile: Dockerfile
+              tags_extra: ""
+              push: false
+
+            - service: paymentservice
+              context: src/paymentservice 
+              dockerfile: Dockerfile
+              tags_extra: "latest"
+
+            - service: productcatalogservice
+              context: src/productcatalogservice
+              dockerfile: Dockerfile
+              tags_extra: "latest"
+
+            - service: recommendationservice
+              context: src/recommendationservice
+              dockerfile: Dockerfile
+              tags_extra: "latest"
+
+            - service: shippingservice
+              context: src/shippingservice
+              dockerfile: Dockerfile
+              tags_extra: "latest"
+
+      with:
+        service: ${{ matrix.service }}
+        context: ${{ matrix.context }}
+        dockerfile: ${{ matrix.dockerfile }}
+        aws_region: ${{ vars.AWS_REGION || env.AWS_REGION_DEFAULT }}
+        ecr_namespace: ${{ vars.ECR_NAMESPACE || env.ECR_NAMESPACE_DEFAULT }}
+        trivy_severity: HIGH,CRITICAL
+        push: ${{ matrix.push || true }}
+        tags_extra: ${{ matrix.tags_extra }}

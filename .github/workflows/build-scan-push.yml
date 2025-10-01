@@ -1,0 +1,129 @@
+name: build-scan-push
+on:
+    workflow_call:
+        inputs:
+            service:
+                type: string
+                description: "Service name (folder and ECR repo name)"
+                required: true
+            context:
+                type: string
+                description: "Docker build context dir"
+                required: true
+                default: "src/${{ inputs.service }}"
+            dockerfile:
+                type: string
+                required: false
+                default: Dockerfile
+            aws_region:
+                type: string
+                required: false
+                default: us-east-1
+            ecr_namespace:
+                type: string
+                required: false
+                default: online-botique
+            trivy_severity:
+                type: string
+                required: false
+                default: "HIGH,CRITICAL"
+            push:
+                type: boolean
+                required: false
+                default: true
+            tags_extra:
+                type: string
+                required: false
+                default: ""
+        secrets:
+            AWS_GHA_ROLE_ARN:
+                required: true
+
+permissions:
+    id-token: write
+    contents: read
+    security-events: write
+
+jobs:
+    build_scan_push:
+        name: Build-->trivy-->push (${{ inputs.service }})
+        runs-on: ubuntu-latest
+        env:
+            AWS_REGION: ${{ inputs.aws_region }}
+            ECR_NAMESPACE: ${{ inputs.ecr_namespace }}
+            SERVICE: ${{ inputs.service }}
+            CONTEXT: ${{ inputs.context }}
+            DOCKERFILE: ${{ inputs.dockerfile }}
+            SHORT_SHA: ${{ github.sha || '' }}
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Configure AWS Credentials via OIDC
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                aws-region: ${{ env.AWS_REGION }}
+                role-to-assume: ${{ secrets.AWS_GHA_ROLE_ARN }}   # IAM ROLE WITH GITHUB OIDC
+
+            - name: Login to Amazon ECR
+              id: ecr-login
+              uses: aws-actions/amazon-ecr-login@v2
+
+            - name: set image tags
+              id: meta
+              run: |
+                TS=$(date +%Y%m%d%H%M%S)
+                SHA="${SHORT_SHA:0:12}"
+                IMAGE="${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_NAMESPACE }}/${{ env.SERVICE}}"
+                TAG1="${TS}-${SHA}"
+                echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+                echo "tag1=${TAG1}" >> $GITHUB_OUTPUT
+                #optional extra tags comma separated
+                if [ -n "${{ inputs.tags_extra }}" ]; then
+                    echo "extra=${{ inputs.tags_extra }}" >> $GITHUB_OUTPUT
+                fi
+
+            - name: enable BuildKit
+              run: echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
+
+            - name: Build image
+              run: |
+                docker build \
+                    -f "${DOCKERFILE}" \
+                    -t "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag1 }}" \
+                    "${CONTEXT}"
+
+            # Trivy image scan (fail on severity threshold)
+            - name: Trivy Scan (image)
+              uses: aquasecurity/trivy-action@0.24.0
+              with:
+                image-ref: "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag1 }}"
+                format: 'sarif'
+                output: 'trivy-image.sarif'
+                vuln-type: 'os,library'
+                severity: ${{ inputs.trivy_severity }}
+                exit-code: '1'                           # fail pipeline on HIGH/CRITICAL by default
+                ignore-unfixed: true
+
+            - name: Upload Trivy image scan results
+              if: always()
+              uses: github/codeql-action/upload-sarif@v3
+              with:
+                sarif_file: trivy-image.sarif
+                category: "trivy-image"
+
+            - name: Push image to ECR
+              if: ${{ inputs.push }}
+              run: |
+                docker push "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag1 }}"
+                # push extra tags if provided (e.g. "latest,main")
+                if [ -n "${{ steps.meta.outputs.extra }}" ]; then
+                    IFS=',' read -ra TAGS <<< "${{ steps.meta.outputs.extra }}"
+                    for t in "${TAGS[@]}"; do
+                        t="$(echo "$t" | xargs)"
+                        [ -z "$t" ] && continue
+                        docker tag "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag1 }}" "${{ steps.meta.outputs.image }}:${t}"
+                        docker push "${{ steps.meta.outputs.image }}:${t}"
+                    done
+                fi

@@ -1,0 +1,66 @@
+name: terraform-ecr
+on:
+    workflow_dispatch:
+        inputs:
+            action:
+                description: "terraform action"
+                type: choice
+                required: true
+                default: plan
+                options: [plan,apply,destroy]
+
+            environment:
+                description: "Target environment eg: dev, staging, prod"
+                type: choice
+                required: true
+                default: dev
+                options: [dev, staging, prod]
+            
+permissions:
+    contents: read
+    id-token: write
+
+env:
+    AWS_REGION: us-east-1
+    TF_WORKDIR: infra/ecr
+
+jobs:
+    terraform:
+        runs-on: ubuntu-latest
+        environment: ${{ inputs.environment }}
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Configure AWS Credentials via OIDC
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                aws-region: ${{ env.AWS_REGION }}
+                role-to-assume: ${{ secrets.AWS_GHA_ROLE_ARN }}   # IAM ROLE WITH GITHUB OIDC
+
+            - name: Setup Terraform
+              uses: hashicorp/setup-terraform@v3
+
+            - name: Terraform init
+              working-directory: ${{ env.TF_WORKDIR }}
+              run: terraform init -input=false
+
+            - name: Terraform validate
+              working-directory: ${{ env.TF_WORKDIR }}
+              run: terraform validate
+
+            - name: Terraform plan
+              if: ${{ inputs.action == 'plan' }}
+              working-directory: ${{ env.TF_WORKDIR }}
+              run: terraform plan -input=false -out=tfplan
+
+            - name: Terraform apply
+              if: ${{ inputs.action == 'apply' }}
+              working-directory: ${{ env.TF_WORKDIR }}
+              run: terraform apply -input=false -auto-approve
+
+            - name: Terraform destroy
+              if: ${{ inputs.action == 'destroy' }}
+              working-directory: ${{ env.TF_WORKDIR }}
+              run: terraform destroy -input=false -auto-approve
