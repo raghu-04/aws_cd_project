@@ -10,7 +10,7 @@ on:
                 type: string
                 description: "Docker build context dir"
                 required: true
-                default: "src/${{ inputs.service }}"
+                default: "services/${{ inputs.service }}"
             dockerfile:
                 type: string
                 required: false

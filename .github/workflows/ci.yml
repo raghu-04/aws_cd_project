@@ -104,7 +104,7 @@ jobs:
             
             - service: cartservice
               context: src/cartservice
-              dockerfile: Dockerfile
+              dockerfile: src/Dockerfile
               tags_extra: latest
             
             - service: checkoutservice
