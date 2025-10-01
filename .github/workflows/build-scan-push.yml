@@ -84,6 +84,20 @@ jobs:
                     echo "extra=${{ inputs.tags_extra }}" >> $GITHUB_OUTPUT
                 fi
 
+            - name: Sanity check paths
+              run: |
+                echo "PWD: $(pwd)"
+                echo "Context: ${CONTEXT}"
+                echo "Dockerfile: ${DOCKERFILE}"
+                if [ ! -d "${CONTEXT}" ]; then
+                    echo "::error file=${CONTEXT}::Build context not found"; exit 1; 
+                fi
+                ls -la "${CONTEXT}" || true
+                if [ ! -f "${CONTEXT}/${DOCKERFILE}" ]; then
+                    echo "::error file=${CONTEXT}/${DOCKERFILE}::Dockerfile not found at ${CONTEXT}/${DOCKERFILE}"
+                    exit 1
+                fi
+
             - name: enable BuildKit
               run: echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
 
