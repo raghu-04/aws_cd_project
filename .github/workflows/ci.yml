@@ -157,8 +157,8 @@ jobs:
         service: ${{ matrix.service }}
         context: ${{ matrix.context }}
         dockerfile: ${{ matrix.dockerfile }}
-        aws_region: ${{ vars.AWS_REGION || env.AWS_REGION_DEFAULT }}
-        ecr_namespace: ${{ vars.ECR_NAMESPACE || env.ECR_NAMESPACE_DEFAULT }}
+        aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+        ecr_namespace: ${{ vars.ECR_NAMESPACE || 'online-botique' }}
         trivy_severity: HIGH,CRITICAL
         push: ${{ matrix.push || true }}
         tags_extra: ${{ matrix.tags_extra }}
