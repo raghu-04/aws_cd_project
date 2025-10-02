@@ -35,6 +35,10 @@ on:
                 type: string
                 required: false
                 default: ""
+            allow_insecure_push:
+                type: boolean 
+                required: false
+                default: false 
         secrets:
             AWS_GHA_ROLE_ARN:
                 required: true
@@ -48,6 +52,7 @@ jobs:
     build_scan_push:
         name: Build-->trivy-->push (${{ inputs.service }})
         runs-on: ubuntu-latest
+        environment: ecr-publish
         env:
             AWS_REGION: ${{ inputs.aws_region }}
             ECR_NAMESPACE: ${{ inputs.ecr_namespace }}
@@ -112,6 +117,7 @@ jobs:
             - name: Trivy Scan (image)
               id: trivy
               uses: aquasecurity/trivy-action@0.24.0
+              continues-on-error: true
               with:
                 image-ref: "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag1 }}"
                 format: 'sarif'
@@ -129,8 +135,11 @@ jobs:
                 category: "trivy-image"
 
             - name: Push image to ECR
-              if: ${{ inputs.push }}
+              if: ${{ inputs.push && (steps.trivy.outcome == 'success' || inputs.allow_insecure_push) }}
               run: |
+                if [ "${{ steps.trivy.outcome }}" != "success" ]; then
+                    echo "::warning::Bypassing Trivy gate due to allow_insecure_push=true"
+                fi
                 docker push "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag1 }}"
                 # push extra tags if provided (e.g. "latest,main")
                 if [ -n "${{ steps.meta.outputs.extra }}" ]; then
@@ -142,3 +151,10 @@ jobs:
                         docker push "${{ steps.meta.outputs.image }}:${t}"
                     done
                 fi
+
+            # ---- Final job status ----
+            - name: Fail job if Trivy failed and override not used
+              if: ${{ steps.trivy.outcome == 'failure' && !inputs.allow_insecure_push }}
+              run: |
+                echo "::error::Trivy detected HIGH/CRITICAL vulnerabilities. Override not granted."
+                exit 1
