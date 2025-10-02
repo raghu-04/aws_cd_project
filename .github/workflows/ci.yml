@@ -103,8 +103,8 @@ jobs:
               tags_extra: latest
             
             - service: cartservice
-              context: src/cartservice
-              dockerfile: src/Dockerfile
+              context: src/cartservice/src
+              dockerfile: Dockerfile
               tags_extra: latest
             
             - service: checkoutservice
@@ -116,7 +116,7 @@ jobs:
               context: src/currencyservice
               dockerfile: Dockerfile
               tags_extra: latest
-              
+
             - service: emailservice
               context: src/emailservice
               dockerfile: Dockerfile
