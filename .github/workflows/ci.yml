@@ -116,7 +116,7 @@ jobs:
               context: src/currencyservice
               dockerfile: Dockerfile
               tags_extra: latest
-
+              
             - service: emailservice
               context: src/emailservice
               dockerfile: Dockerfile
