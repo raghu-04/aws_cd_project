@@ -7,7 +7,7 @@ terraform {
     }
 }
 
-# --- ECR REPOSITORY PER SERVICENAME ---
+#--- ECR REPOSITORY PER SERVICENAME ---
 resource "aws_ecr_repository" "svc" {
     for_each = toset(var.services)
     name     = "${var.ecr_namespace}/${each.value}"
