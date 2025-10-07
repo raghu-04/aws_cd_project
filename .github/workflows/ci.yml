@@ -87,7 +87,7 @@ jobs:
             sonar_extra_args: ${{ matrix.sonar_extra_args || '' }}
 
     
-  ################ TERRAFORM ECR #######################
+  ################TERRAFORM ECR#######################
     ecr_iac:
       name: Provision ECR (Terraform)
       uses: ./.github/workflows/terraform-ecr.yml
