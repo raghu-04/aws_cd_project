@@ -25,17 +25,19 @@ resource "aws_ecr_lifecycle_policy" "keep_recent" {
     for_each = aws_ecr_repository.svc
     repository = each.value.name
     policy = jsondecode({
-        rules = [{
-            description = "Keep only the last 20 images"
-            selection = {
-                tagStatus = "any"
-                countType = "imageCountMoreThan"
-                countNumber = 20
+        rules = [
+            {
+                description = "Keep only the last 20 images"
+                selection = {
+                    tagStatus = "any"
+                    countType = "imageCountMoreThan"
+                    countNumber = 20
+                }
+                action = {
+                    type = "expire"
+                }
             }
-            action = {
-                type = "expire"
-            }
-        }]
+        ]
     })
 }
 

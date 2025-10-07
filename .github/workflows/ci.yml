@@ -9,6 +9,7 @@ on:
             - '.github/workflows/ci.yml'
             - '.github/workflows/_reusable_ci.yml'
             - '.github/workflows/build-scan-push.yml'
+            - '.github/workflows/terraform-ecr.yml'
     pull_request:
         branches:
             - main
@@ -17,6 +18,7 @@ on:
             - '.github/workflows/ci.yml'
             - '.github/workflows/_reusable_ci.yml'
             - '.github/workflows/build-scan-push.yml'
+            - '.github/workflows/terraform-ecr.yml'
 permissions:
     contents: read
     security-events: write
