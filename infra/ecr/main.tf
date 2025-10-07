@@ -20,7 +20,7 @@ resource "aws_ecr_repository" "svc" {
     }
 }
 
-# image Lifecycle (keeps upto latest 20 images)
+#image Lifecycle (keeps upto latest 20 images)
 resource "aws_ecr_lifecycle_policy" "keep_recent" {
     for_each = aws_ecr_repository.svc
     repository = each.value.name
