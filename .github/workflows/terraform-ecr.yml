@@ -3,40 +3,27 @@ on:
     workflow_call:
       inputs:
         action:
-          description: "terraform action"
-          type: choice
+          type: string
           required: true
-          default: apply
-          options: [plan,apply,destroy]
-
+          default: apply        # plan | apply | destroy
         environment:
-          description: "Target environment eg: dev, staging, prod"
-          type: choice
+          type: string
           required: true
           default: dev
-          options: [dev, staging, prod]
-
         aws_region:
-          description: "AWS region"
           type: string
           required: false
           default: us-east-1
-
         ecr_namespace:
-          description: "ECR namespace (prefix for all ECR repos)"
           type: string
           required: false
           default: online-boutique
-            
         services_csv:
-          description: "Comma-separated list of services to create ECR repos for"
           type: string
           required: false
           default: "adservice,cartservice,checkoutservice,currencyservice,emailservice,frontend,loadgenerator,paymentservice,productcatalogservice,recommendationservice,shippingservice"
-
       secrets:
         AWS_GHA_ROLE_ARN:
-          description: "AWS IAM Role ARN to assume (with OIDC trust for this repo)"
           required: true
 
     workflow_dispatch:
