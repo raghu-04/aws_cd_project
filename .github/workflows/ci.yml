@@ -105,7 +105,7 @@ jobs:
 
 
 
-  ################BUILD-->TRIVY-->PUSH#######################
+  ################ BUILD-->TRIVY-->PUSH#######################
 
     build_scan_push_each:
       name: Build-->trivy-->push (${{ matrix.service }})
