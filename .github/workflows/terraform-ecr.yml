@@ -110,7 +110,7 @@ jobs:
               working-directory: ${{ env.TF_WORKDIR }}
               run: |
                 terraform plan -input=false \
-                -var="aws_region=${{ inputs.aws_region }}" \
+                -var="region=${{ inputs.aws_region }}" \
                 -var="ecr_namespace=${{ inputs.ecr_namespace }}" \
                 -var='services=${{ steps.svc.outputs.list }}'
 
@@ -119,7 +119,7 @@ jobs:
               working-directory: ${{ env.TF_WORKDIR }}
               run: |
                 terraform apply -input=false -auto-approve \
-                -var="aws_region=${{ inputs.aws_region }}" \
+                -var="region=${{ inputs.aws_region }}" \
                 -var="ecr_namespace=${{ inputs.ecr_namespace }}" \
                 -var='services=${{ steps.svc.outputs.list }}'
 
@@ -128,6 +128,6 @@ jobs:
               working-directory: ${{ env.TF_WORKDIR }}
               run: |
                 terraform destroy -auto-approve \
-                -var="aws_region=${{ inputs.aws_region }}" \
+                -var="region=${{ inputs.aws_region }}" \
                 -var="ecr_namespace=${{ inputs.ecr_namespace }}" \
                 -var='services=${{ steps.svc.outputs.list }}'
