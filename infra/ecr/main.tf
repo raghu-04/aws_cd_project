@@ -24,7 +24,7 @@ resource "aws_ecr_repository" "svc" {
 resource "aws_ecr_lifecycle_policy" "keep_recent" {
     for_each = aws_ecr_repository.svc
     repository = each.value.name
-    policy = jsondencode({
+    policy = jsondecode({
         rules = [{
             description = "Keep only the last 20 images"
             selection = {
