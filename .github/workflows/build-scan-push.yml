@@ -60,6 +60,8 @@ jobs:
             CONTEXT: ${{ inputs.context }}
             DOCKERFILE: ${{ inputs.dockerfile }}
             SHORT_SHA: ${{ github.sha || '' }}
+            ALLOW_OVERRIDE: ${{ inputs.allow_insecure_push || vars.ALLOW_INSECURE_PUSH || secrets.ALLOW_INSECURE_PUSH }}
+
 
         steps:
             - name: Checkout

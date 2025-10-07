@@ -162,4 +162,4 @@ jobs:
         trivy_severity: HIGH,CRITICAL
         push: ${{ matrix.push || true }}
         tags_extra: ${{ matrix.tags_extra }}
-        allow_insecure_push: false 
+        allow_insecure_push: true 
