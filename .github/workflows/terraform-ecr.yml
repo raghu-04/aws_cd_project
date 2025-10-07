@@ -1,21 +1,74 @@
 name: terraform-ecr
 on:
-    workflow_dispatch:
-        inputs:
-            action:
-                description: "terraform action"
-                type: choice
-                required: true
-                default: plan
-                options: [plan,apply,destroy]
+    workflow_call:
+      inputs:
+        action:
+          description: "terraform action"
+          type: choice
+          required: true
+          default: apply
+          options: [plan,apply,destroy]
 
-            environment:
-                description: "Target environment eg: dev, staging, prod"
-                type: choice
-                required: true
-                default: dev
-                options: [dev, staging, prod]
+        environment:
+          description: "Target environment eg: dev, staging, prod"
+          type: choice
+          required: true
+          default: dev
+          options: [dev, staging, prod]
+
+        aws_region:
+          description: "AWS region"
+          type: string
+          required: false
+          default: us-east-1
+
+        ecr_namespace:
+          description: "ECR namespace (prefix for all ECR repos)"
+          type: string
+          required: false
+          default: online-boutique
             
+        services_csv:
+          description: "Comma-separated list of services to create ECR repos for"
+          type: string
+          required: false
+          default: "adservice,cartservice,checkoutservice,currencyservice,emailservice,frontend,loadgenerator,paymentservice,productcatalogservice,recommendationservice,shippingservice"
+
+      secrets:
+        AWS_GHA_ROLE_ARN:
+          description: "AWS IAM Role ARN to assume (with OIDC trust for this repo)"
+          required: true
+
+    workflow_dispatch:
+      inputs:
+        action:
+          description: "terraform action"
+          type: choice
+          required: true
+          default: plan
+          options: [plan,apply,destroy]
+        environment:
+          description: "Target environment eg: dev, staging, prod"
+          type: choice
+          required: true
+          default: dev
+          options: [dev, staging, prod]
+        aws_region:
+          description: "AWS region"
+          type: string
+          required: false
+          default: us-east-1
+        ecr_namespace:
+          description: "ECR namespace (prefix for all ECR repos)"
+          type: string
+          required: false
+          default: online-boutique
+        services_csv:
+          description: "Comma-separated list of services to create ECR repos for"
+          type: string
+          required: false
+          default: "adservice,cartservice,checkoutservice,currencyservice,emailservice,frontend,loadgenerator,paymentservice,productcatalogservice,recommendationservice,shippingservice"
+
 permissions:
     contents: read
     id-token: write
@@ -42,6 +95,21 @@ jobs:
             - name: Setup Terraform
               uses: hashicorp/setup-terraform@v3
 
+            - name: Render services list for TF
+              id: svc
+              shell: bash
+              run: |
+                IFS=',' read -ra ITEMS <<< "${{ inputs.services_csv }}"
+                LIST="["
+                SEP=""
+                for i in "${ITEMS[@]}"; do
+                  i="$(echo "$i" | xargs)"
+                  [ -z "$i" ] && continue
+                  LIST="${LIST}${SEP}\"${i}\""
+                  SEP=","
+                done
+                LIST="${LIST}]"
+                echo "list=${LIST}" >> "$GITHUB_OUTPUT"
             - name: Terraform init
               working-directory: ${{ env.TF_WORKDIR }}
               run: terraform init -input=false
@@ -53,14 +121,26 @@ jobs:
             - name: Terraform plan
               if: ${{ inputs.action == 'plan' }}
               working-directory: ${{ env.TF_WORKDIR }}
-              run: terraform plan -input=false -out=tfplan
+              run: |
+                terraform plan -input=false \
+                -var="aws_region=${{ inputs.aws_region }}" \
+                -var="ecr_namespace=${{ inputs.ecr_namespace }}" \
+                -var='services=${{ steps.svc.outputs.list }}'
 
             - name: Terraform apply
               if: ${{ inputs.action == 'apply' }}
               working-directory: ${{ env.TF_WORKDIR }}
-              run: terraform apply -input=false -auto-approve
+              run: |
+                terraform apply -input=false -auto-approve \
+                -var="aws_region=${{ inputs.aws_region }}" \
+                -var="ecr_namespace=${{ inputs.ecr_namespace }}" \
+                -var='services=${{ steps.svc.outputs.list }}'
 
             - name: Terraform destroy
               if: ${{ inputs.action == 'destroy' }}
               working-directory: ${{ env.TF_WORKDIR }}
-              run: terraform destroy -input=false -auto-approve
+              run: |
+                terraform destroy -auto-approve \
+                -var="aws_region=${{ inputs.aws_region }}" \
+                -var="ecr_namespace=${{ inputs.ecr_namespace }}" \
+                -var='services=${{ steps.svc.outputs.list }}'

@@ -86,6 +86,25 @@ jobs:
             working_dir: src/${{ matrix.service }}
             sonar_extra_args: ${{ matrix.sonar_extra_args || '' }}
 
+    
+  ################TERRAFORM ECR#######################
+    ecr_iac:
+      name: Provision ECR (Terraform)
+      uses: ./.github/workflows/terraform-ecr.yml
+      secrets:
+        AWS_GHA_ROLE_ARN: ${{ secrets.AWS_GHA_ROLE_ARN }}
+      with:
+        action: apply
+        environment: dev               # or prod, as you like
+        aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+        ecr_namespace: ${{ vars.ECR_NAMESPACE || 'online-boutique' }}
+        services_csv: "adservice,cartservice,checkoutservice,currencyservice,emailservice,frontend,loadgenerator,paymentservice,productcatalogservice,recommendationservice,shippingservice"
+
+
+
+
+  ################BUILD-->TRIVY-->PUSH#######################
+
     build_scan_push_each:
       name: Build-->trivy-->push (${{ matrix.service }})
       needs: [ sonar_each ]
