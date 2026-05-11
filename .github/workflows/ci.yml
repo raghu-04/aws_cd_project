@@ -1,0 +1,72 @@
+name: CI - Code Scan, Image Build, Image Scan, Container Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  frontend-ci:
+    name: Frontend CI Pipeline
+    runs-on: ubuntu-latest
+
+    env:
+      SERVICE_NAME: frontend
+      SERVICE_PATH: src/frontend
+      IMAGE_NAME: frontend:test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Stage 1: Code scanning using SonarQube/SonarCloud.
+      # Add SONAR_TOKEN and SONAR_HOST_URL as GitHub repository secrets before enabling strict scan enforcement.
+      - name: Code scan with SonarQube
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          projectBaseDir: ${{ env.SERVICE_PATH }}
+
+      - name: Skip SonarQube scan when secrets are missing
+        if: env.SONAR_TOKEN == ''
+        run: |
+          echo "SONAR_TOKEN is not configured yet. Skipping SonarQube scan for now."
+          echo "Later: add SONAR_TOKEN and SONAR_HOST_URL repository secrets to enable this stage."
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # Stage 2: Build Docker image locally. No image is pushed to AWS/ECR in this phase.
+      - name: Build Docker image
+        run: |
+          docker build -t $IMAGE_NAME ./$SERVICE_PATH
+
+      # Stage 3: Scan the built image using Trivy.
+      - name: Trivy image vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}
+          format: table
+          exit-code: '0'
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      # Stage 4: Containerization validation.
+      # This verifies that the built image can be converted into a runnable container.
+      - name: Run container smoke test
+        run: |
+          docker run -d --name frontend-smoke-test -p 8080:8080 $IMAGE_NAME
+          sleep 10
+          docker ps -a
+          docker logs frontend-smoke-test || true
+          docker inspect frontend-smoke-test --format='Container status: {{.State.Status}}'
+          docker rm -f frontend-smoke-test
